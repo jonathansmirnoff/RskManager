@@ -3,7 +3,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace RskManager.Models
 {
-    public class DeployContractModel
+    public class CallContractFunctionParameterModel
     {
         [Required]
         public string SenderPrivateKey
@@ -27,7 +27,20 @@ namespace RskManager.Models
         }
 
         [Required]
-        public string Bytecode
+        public string ContractAddress
+        {
+            get;
+            set;
+        }
+
+        [Required]
+        public string FunctionName
+        {
+            get;
+            set;
+        }
+
+        public string Parameter
         {
             get;
             set;

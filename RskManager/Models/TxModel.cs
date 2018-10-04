@@ -3,7 +3,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace RskManager.Models
 {
-    public class DeployContractModel
+    public class TxModel
     {
         [Required]
         public string SenderPrivateKey
@@ -20,14 +20,14 @@ namespace RskManager.Models
         }
 
         [Required]
-        public string Abi
+        public string ToAddress
         {
             get;
             set;
         }
 
         [Required]
-        public string Bytecode
+        public string Value
         {
             get;
             set;
