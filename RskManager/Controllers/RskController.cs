@@ -3,16 +3,18 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Nethereum.Hex.HexConvertors.Extensions;
 using Nethereum.Hex.HexTypes;
+using Nethereum.Util;
 using Nethereum.Web3;
 using Nethereum.Web3.Accounts;
 using RskManager.Models;
+using static Nethereum.Util.UnitConversion;
 
 namespace RskManager.Controllers
 {
     [Route("api/[controller]")]
     public class RskController : Controller
     {
-        readonly static string NodeUrl = "https://lb-publicnode-test.rsklabs.io/";
+        readonly static string NodeUrl = "https://public-node.testnet.rsk.co";
         readonly Web3 Web3Client = new Web3(NodeUrl);
 
         public RskController()
@@ -36,6 +38,38 @@ namespace RskManager.Controllers
                 var account = new Nethereum.Web3.Accounts.Account(privateKey);
 
                 return Json(new AccountModel(account.Address.ToLower(), account.PrivateKey));
+            }
+            catch (Exception ex)
+            {
+                return ReturnError(ex);
+            }
+        }
+
+        [HttpPost("SendRbtcOnlyForRegtest")]
+        public async Task<IActionResult> SendRbtcOnlyForRegtest(string address)
+        {
+            try
+            {
+                UnitConversion unitConversion = new UnitConversion();
+
+                var personalAccounts = await Web3Client.Eth.Accounts.SendRequestAsync();
+
+                if (personalAccounts != null && personalAccounts.Length > 0)
+                {
+
+                    var transacInpunt = new Nethereum.RPC.Eth.DTOs.TransactionInput
+                    {
+                        From = personalAccounts[0],
+                        To = address,
+                        Value = new HexBigInteger(unitConversion.ToWei(0.1, EthUnit.Ether))
+                    };
+
+                    var tx = await Web3Client.Eth.Transactions.SendTransaction.SendRequestAsync(transacInpunt);
+
+                    return Json(tx);
+                }
+
+                return Json(string.Empty);
             }
             catch (Exception ex)
             {
