@@ -10,7 +10,7 @@ namespace RskManager.Controllers
 {
     public class LoteryController : Controller
     {
-        readonly static string NodeUrl = "https://public-node.testnet.rsk.co";
+        readonly static string NodeUrl = "https://lb-publicnode-test.rsklabs.io";
         readonly Web3 Web3Client = new Web3(NodeUrl);
 
         static string LoteryContractAddress = "0x731e7c3ab5594c0ce7ca04e870e3e086d750218d";

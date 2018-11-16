@@ -14,7 +14,7 @@ namespace RskManager.Controllers
     [Route("api/[controller]")]
     public class RskController : Controller
     {
-        readonly static string NodeUrl = "https://public-node.testnet.rsk.co";
+        readonly static string NodeUrl = "https://lb-publicnode-test.rsklabs.io";
         readonly Web3 Web3Client = new Web3(NodeUrl);
 
         public RskController()
