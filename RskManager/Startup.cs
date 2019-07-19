@@ -28,7 +28,7 @@ namespace RskManager
 
             services.AddSwaggerGen(c =>
             {
-                c.SwaggerDoc("v1", new Info { Title = "RskManager", Version = "v1" });
+                c.SwaggerDoc("v1", new Info { Title = "My RSK Api", Version = "v1" });
             });
         }
 
@@ -48,7 +48,7 @@ namespace RskManager
 
             app.UseSwaggerUI(c =>
             {
-                c.SwaggerEndpoint("/swagger/v1/swagger.json", "RskManager");
+                c.SwaggerEndpoint("/swagger/v1/swagger.json", "My RSK Api");
             });
         }
     }

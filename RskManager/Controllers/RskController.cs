@@ -14,7 +14,7 @@ namespace RskManager.Controllers
     [Route("api/[controller]")]
     public class RskController : Controller
     {
-        readonly static string NodeUrl = "https://lb-publicnode-test.rsklabs.io";
+        readonly static string NodeUrl = "http://localhost:4444";
         readonly Web3 Web3Client = new Web3(NodeUrl);
 
         public RskController()
@@ -32,9 +32,25 @@ namespace RskManager.Controllers
         {
             try
             {
-                //Crypto stuff to generate new account!
                 var ecKey = Nethereum.Signer.EthECKey.GenerateKey();
                 var privateKey = ecKey.GetPrivateKeyAsBytes().ToHex();
+                var account = new Nethereum.Web3.Accounts.Account(privateKey);
+
+                return Json(new AccountModel(account.Address.ToLower(), account.PrivateKey));
+            }   
+            catch (Exception ex)
+            {
+                return ReturnError(ex);
+            }
+        }
+
+        [HttpPost("GetPublicKeyFromPrivate")]
+        public async Task<IActionResult> GetPublicKeyFromPrivate(string privateKey)
+        {
+            try
+            {
+                //var ecKey = Nethereum.Signer.EthECKey.GenerateKey();
+                //var privateKey = ecKey.GetPrivateKeyAsBytes().ToHex();
                 var account = new Nethereum.Web3.Accounts.Account(privateKey);
 
                 return Json(new AccountModel(account.Address.ToLower(), account.PrivateKey));
@@ -44,6 +60,8 @@ namespace RskManager.Controllers
                 return ReturnError(ex);
             }
         }
+
+
 
         [HttpPost("SendRbtcOnlyForRegtest")]
         public async Task<IActionResult> SendRbtcOnlyForRegtest(string address)
@@ -77,13 +95,42 @@ namespace RskManager.Controllers
             }
         }
 
+        [HttpGet("GetMinimumGasPrice")]
+        public async Task<IActionResult> GetMinimumGasPrice()
+        {
+            try
+            {
+                var result = await Web3Client.Eth.Blocks.GetBlockWithTransactionsByNumber.SendRequestAsync(new Nethereum.RPC.Eth.DTOs.BlockParameter());
+
+                return Json(result);
+            }
+            catch (Exception ex)
+            {
+                return ReturnError(ex);
+            }
+        }
+
         [HttpGet("GetBlockNumber")]
         public async Task<IActionResult> GetBlockNumber()
         {
             try
             {
-                //TODO: Implement!
-                return null;
+                var result = await Web3Client.Eth.Blocks.GetBlockNumber.SendRequestAsync();
+                return Json(result.Value);
+            }
+            catch (Exception ex)
+            {
+                return ReturnError(ex);
+            }
+        }
+
+        [HttpGet("GetAccounts")]
+        public async Task<IActionResult> GetAccounts()
+        {
+            try
+            {
+                var result = await Web3Client.Eth.Accounts.SendRequestAsync();
+                return Json(result);
             }
             catch (Exception ex)
             {
@@ -96,8 +143,13 @@ namespace RskManager.Controllers
         {
             try
             {
-                //TODO: Implement!
-                return null;
+                if (String.IsNullOrWhiteSpace(address))
+                    BadRequest("Address is null");
+
+                UnitConversion unitConversion = new UnitConversion();
+
+                var balance = await Web3Client.Eth.GetBalance.SendRequestAsync(address);                
+                return Json(unitConversion.FromWei(balance.Value, EthUnit.Ether));
             }
             catch (Exception ex)
             {
@@ -122,18 +174,66 @@ namespace RskManager.Controllers
             }
         }
 
+        [HttpPost("PersonalSendTx")]
+        public async Task<IActionResult> PersonalSendTx([FromBody]TxPersonalModel txModel)
+        {
+            try
+            {
+                if (ModelState.IsValid)
+                {
+                    UnitConversion unitConversion = new UnitConversion();
+
+                    var transacInpunt = new Nethereum.RPC.Eth.DTOs.TransactionInput
+                    {
+                        From = txModel.SenderAddress,
+                        To = txModel.ToAddress,
+                        Value = new HexBigInteger(unitConversion.ToWei(txModel.Value, EthUnit.Ether))
+                    };
+
+                    var tx = await Web3Client.Eth.Transactions.SendTransaction.SendRequestAsync(transacInpunt);
+                    return Json(tx);
+                }
+
+                return BadRequest(ModelState);
+                
+            }
+            catch(Exception ex)
+            {
+                return ReturnError(ex);
+            }
+            
+        }
+
         [HttpPost("SendTx")]
         public async Task<IActionResult> SendTx([FromBody]TxModel txModel)
         {
             try
             {
-                //TODO: Implement!
-                //Tips:
-                    // - get transaction count
-                    // - build and sign the tx OfflineTransactionSigner
-                    // - Send the tx using SendRawTransaction
+                if (ModelState.IsValid)
+                {
+                    var txCount = Web3Client
+                        .Eth.Transactions
+                        .GetTransactionCount
+                        .SendRequestAsync(txModel.SenderAddress).Result;
 
-                return null;
+
+                    var encoded = Web3.OfflineTransactionSigner
+                                      .SignTransaction(txModel.SenderPrivateKey,
+                                                       txModel.ToAddress,
+                                                       new HexBigInteger(txModel.Value),
+                                                       txCount.Value,
+                                                       new HexBigInteger("0x0"),
+                                                       new HexBigInteger(21000));
+
+                    var send = await Web3Client.Eth
+                                               .Transactions
+                                               .SendRawTransaction
+                                               .SendRequestAsync("0x" + encoded);
+
+                    return Json(send);
+                }
+
+                return BadRequest(ModelState);
             }
             catch (Exception ex)
             {
@@ -148,25 +248,24 @@ namespace RskManager.Controllers
             {
                 if (ModelState.IsValid)
                 {
-                    /*
-                     
+                    //new HexBigInteger(0x300000)
+                    //gasPrice = 0x0
+                    //value = 0x0
                     var gas = await Web3Client.Eth.DeployContract.EstimateGasAsync(deployContractModel.Abi,
                                                                                    deployContractModel.Bytecode,
                                                                                    deployContractModel.SenderAddress,
                                                                                    null);
-
+                    
 
                     var w = new Web3(new Account(deployContractModel.SenderPrivateKey), NodeUrl);
-                    ....
-                    ....
-
-
-
+                    var txHash = await w.Eth.DeployContract
+                                        .SendRequestAsync(deployContractModel.Abi,
+                                                          deployContractModel.Bytecode,
+                                                          deployContractModel.SenderAddress,
+                                                          gas,
+                                                          new HexBigInteger("0x0"),
+                                                          new HexBigInteger("0x0"));
                     return Json(txHash);
-                    */
-
-                    //TODO: Implement!
-                    return null;
                 }
 
                 return BadRequest(ModelState);
@@ -177,18 +276,39 @@ namespace RskManager.Controllers
             }
         }
 
+        [HttpGet("GetTransactionReceipt")]
+        public async Task<IActionResult> GetTransactionReceipt(string txHash)
+        {
+            try
+            {
+                return Json(await Web3Client.Eth.Transactions.GetTransactionReceipt.SendRequestAsync(txHash));
+            }
+            catch(Exception ex)
+            {
+                return ReturnError(ex);
+            }
+
+        }
+
         [HttpGet("GetContractAddress")]
         public async Task<IActionResult> GetContractAddress(string txHash)
         {
             try
             {
-                //TODO: Implement!
-                return null;
+                if (string.IsNullOrWhiteSpace(txHash))
+                    return BadRequest("txHash is null");
+
+                var receipt = await Web3Client.Eth.Transactions.GetTransactionReceipt.SendRequestAsync(txHash);
+
+                if (receipt != null)
+                    return Json(receipt.ContractAddress);
+                else
+                    return Json(string.Empty);
             }
             catch (Exception ex)
             {
                 return ReturnError(ex);
-            }
+            }        
         }
 
         [HttpPost("CallContractFunctionTxParameter")]
@@ -203,11 +323,12 @@ namespace RskManager.Controllers
                     var contract = w.Eth.GetContract(callContractFunction.Abi, callContractFunction.ContractAddress);
                     var contractFunction = contract.GetFunction(callContractFunction.FunctionName);
 
-                    var gas = new HexBigInteger(90000);
-
                     string tx;
+
                     if (callContractFunction.Parameter == null)
-                    {
+                    {                        
+                        var gas = await contractFunction.EstimateGasAsync(null);
+
                         tx = await contractFunction.SendTransactionAsync(
                                               callContractFunction.SenderAddress,
                                               gas,
@@ -216,9 +337,10 @@ namespace RskManager.Controllers
                                               null);
                     }
                     else
-                    {                        
+                    {
+                        //var gas = await contractFunction.EstimateGasAsync(callContractFunction.Parameter);
                         tx = await contractFunction.SendTransactionAsync(callContractFunction.SenderAddress,
-                                              gas,
+                                              new HexBigInteger("0x34000"),
                                               new HexBigInteger("0x0"),
                                               new HexBigInteger("0x0"),
                                               callContractFunction.Parameter);
@@ -241,8 +363,13 @@ namespace RskManager.Controllers
         {
             try
             {
-                //TODO: Implement!
-                return null;
+                if (ModelState.IsValid)
+                {
+                    var contract = Web3Client.Eth.GetContract(callContractFunction.Abi, callContractFunction.ContractAddress);
+                    var result = await contract.GetFunction(callContractFunction.FunctionName).CallAsync<object>();
+
+                    return Json(result);
+                }
 
                 return BadRequest(ModelState);
             }
@@ -252,8 +379,14 @@ namespace RskManager.Controllers
             }
         }
 
+
+        /// <summary>
+        /// Returns the error.
+        /// </summary>
+        /// <returns>The error.</returns>
+        /// <param name="ex">Ex.</param>
         private IActionResult ReturnError(Exception ex)
-        {
+        {            
             return StatusCode(500, ex.Message);
         }
     }
